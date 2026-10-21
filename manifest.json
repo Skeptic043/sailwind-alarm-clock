@@ -1,0 +1,9 @@
+{
+  "name": "Alarm_Clock",
+  "version_number": "0.2.0",
+  "website_url": "https://github.com/Skeptic043/sailwind-alarm-clock",
+  "description": "Set a daily alarm on any chronometer. It rings its bell and wakes you from sleep.",
+  "dependencies": [
+    "BepInEx-BepInExPack-5.4.2305"
+  ]
+}
