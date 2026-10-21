@@ -2,7 +2,7 @@
 
 ## Version 0.2.1
 
-- Fixed alarm tooltip not showing up when hovering over a locked clock (Thanks @Dumpshock)
+- Fixed alarm tooltip not showing up when hovering over a locked clock (Thanks Dumpshock)
 - Add toggle to enable or disable alarm help tooltip
 
 ## Version 0.2.0
