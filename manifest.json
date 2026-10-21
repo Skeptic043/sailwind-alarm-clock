@@ -1,6 +1,6 @@
 {
   "name": "Alarm_Clock",
-  "version_number": "0.2.0",
+  "version_number": "0.2.1",
   "website_url": "https://github.com/Skeptic043/sailwind-alarm-clock",
   "description": "Set a daily alarm on any chronometer. It rings its bell and wakes you from sleep.",
   "dependencies": [

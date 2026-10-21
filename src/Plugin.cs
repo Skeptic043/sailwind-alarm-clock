@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace AlarmClock
 {
-    [BepInPlugin(Id, "Alarm Clock", "0.2.0")]
+    [BepInPlugin(Id, "Alarm Clock", "0.2.1")]
     public sealed class Plugin : BaseUnityPlugin
     {
         public const string Id = "com.skeptic043.sailwind.alarmclock";
@@ -16,6 +16,7 @@ namespace AlarmClock
         private static ConfigEntry<float> ringDuration;
         private static ConfigEntry<float> volume;
         private static ConfigEntry<float> bellPitch;
+        private static ConfigEntry<bool> controlsTooltip;
         private Harmony harmony;
 
         internal static ManualLogSource Log { get; private set; }
@@ -26,6 +27,7 @@ namespace AlarmClock
         internal static float RingDuration => ringDuration.Value;
         internal static float Volume => volume.Value;
         internal static float BellPitch => bellPitch.Value;
+        internal static bool ControlsTooltip => controlsTooltip.Value;
 
         // KeyboardShortcut.IsPressed fails while any other key is down, which rules out
         // the modifier with R or while walking. Only the shortcut's own keys matter here.
@@ -56,6 +58,8 @@ namespace AlarmClock
             bellPitch = Config.Bind("Alarm", "Bell pitch", 2.5f, new ConfigDescription(
                 "How small the bell sounds. Higher values sound like a smaller, brighter bell. 1 is the game's original bell.",
                 new AcceptableValueRange<float>(1f, 3f)));
+            controlsTooltip = Config.Bind("Display", "Show controls tooltip", true,
+                "While you hold the alarm modifier and look at a chronometer, show how to set the alarm below it. The alarm time is always shown.");
             try
             {
                 harmony = new Harmony(Id);
@@ -108,6 +112,39 @@ namespace AlarmClock
             }
         }
 
+        // With empty hands the native raycast only targets nailed crates, bottles and beds,
+        // so a nailed chronometer could not be looked at, set or stopped. Target it the
+        // same way those items are, after the raycast has stored this frame's hit.
+        private static class PointerAccess
+        {
+            public static readonly AccessTools.FieldRef<GoPointer, RaycastHit> Hit =
+                AccessTools.FieldRefAccess<GoPointer, RaycastHit>("hit");
+            public static readonly AccessTools.FieldRef<GoPointer, GoPointerButton> PointedAt =
+                AccessTools.FieldRefAccess<GoPointer, GoPointerButton>("pointedAtButton");
+            public static readonly AccessTools.FieldRef<GoPointer, float> LookDistance =
+                AccessTools.FieldRefAccess<GoPointer, float>("currentLookDistance");
+        }
+
+        [HarmonyPatch(typeof(GoPointer), "DoRaycast")]
+        private static class NailedLookPatch
+        {
+            private static void Postfix(GoPointer __instance) => Guard("nailed look", () =>
+            {
+                if (__instance.type == GoPointer.PointerType.crosshairMouse && GameState.inCursorMenu) return;
+                if (PointerAccess.PointedAt(__instance) != null || __instance.GetHeldItem() != null) return;
+                if (GameState.sleeping || GameState.inBed != null || BoatCamera.on) return;
+                var hit = PointerAccess.Hit(__instance);
+                var collider = hit.collider;
+                if (collider == null) return;
+                if (collider.CompareTag("ItemSubcollider")) collider = collider.transform.parent.GetComponent<Collider>();
+                var clock = collider != null ? collider.GetComponent<ShipItemClock>() : null;
+                if (clock == null || !clock.nailed || clock.unclickable) return;
+                PointerAccess.PointedAt(__instance) = clock;
+                clock.Look(__instance);
+                PointerAccess.LookDistance(__instance) = hit.distance;
+            });
+        }
+
         // Taking the wheel here, before GoPointer reads it, keeps native scroll
         // rotation and other held-item scroll handlers from also acting on it.
         [HarmonyPatch(typeof(GameInput), nameof(GameInput.GetScrollAxis))]
@@ -137,6 +174,9 @@ namespace AlarmClock
         {
             public static readonly AccessTools.FieldRef<LookUI, TextMesh> ControlsText =
                 AccessTools.FieldRefAccess<LookUI, TextMesh>("controlsText");
+            // The line under the look text that shows the item's tooltip (its description).
+            public static readonly AccessTools.FieldRef<LookUI, TextMesh> TooltipText =
+                AccessTools.FieldRefAccess<LookUI, TextMesh>("hintText");
             public static readonly AccessTools.FieldRef<LookUI, GoPointer> Pointer =
                 AccessTools.FieldRefAccess<LookUI, GoPointer>("pointer");
             public static readonly Action<LookUI> ShowRicon =
@@ -158,21 +198,27 @@ namespace AlarmClock
         {
             private static void Postfix(LookUI __instance, GoPointerButton button) => Guard("look prompt", () =>
             {
-                if (!Settings.controlsTextEnabled || !(button is ShipItemClock clock)) return;
+                if (!(button is ShipItemClock clock)) return;
+                // Written directly every frame, so it appears with the modifier and native
+                // code puts the chronometer's own tooltip back once it is released.
+                string tooltip = clock.GetComponent<ChronometerAlarm>()?.Tooltip();
+                if (tooltip != null) LookUiAccess.TooltipText(__instance).text = tooltip;
+                if (!Settings.controlsTextEnabled) return;
                 var text = LookUiAccess.ControlsText(__instance);
                 // R reaches the looked-at clock only with empty hands. Otherwise it goes to the held item.
                 var pointer = LookUiAccess.Pointer(__instance);
-                if (Ringing(button) && pointer != null && pointer.GetHeldItem() == null)
+                bool emptyHands = pointer != null && pointer.GetHeldItem() == null;
+                if (Ringing(button) && emptyHands)
                 {
                     // A nailed clock gets no native prompt, so its first line would be stale.
                     string pickUp = clock.nailed ? "" : text.text.Split('\n')[0];
                     LookUiAccess.ShowRicon(__instance);
                     text.text = pickUp + "\n" + StopPrompt;
                 }
-                else if (text.text.EndsWith("\n" + StopPrompt))
+                else if ((clock.nailed && emptyHands) || text.text.EndsWith("\n" + StopPrompt))
                 {
-                    // Native code leaves the text alone for a nailed clock, so clear our own
-                    // prompt once the alarm stops.
+                    // Native code leaves the previous object's text for a nailed clock,
+                    // and our own prompt once the alarm stops.
                     LookUiAccess.HideIcons(__instance);
                     text.text = "";
                 }

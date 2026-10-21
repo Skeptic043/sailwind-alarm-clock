@@ -7,7 +7,6 @@ namespace AlarmClock
     // the modifier controls and the look text. Scheduling and ringing live elsewhere.
     internal sealed class ChronometerAlarm : MonoBehaviour
     {
-        private const float PopupSeconds = 1.5f;
         private static readonly Dictionary<int, ChronometerAlarm> live = new Dictionary<int, ChronometerAlarm>();
         private static int editFrame = -10;
         private static AudioClip click;
@@ -16,7 +15,6 @@ namespace AlarmClock
         private SaveablePrefab saveable;
         private AlarmRinger ringer;
         private int registeredId;
-        private string nativeDescription;
         private bool wroteText;
         private float wheelAccumulated;
 
@@ -36,7 +34,6 @@ namespace AlarmClock
             item = GetComponent<ShipItem>();
             saveable = GetComponent<SaveablePrefab>();
             ringer = gameObject.AddComponent<AlarmRinger>();
-            nativeDescription = item.description;
         }
 
         private void Update()
@@ -99,7 +96,6 @@ namespace AlarmClock
             record.Enabled = true;
             record.NextDue = AlarmTime.NextOccurrenceAfter(record.Minute, now);
             PlayClick();
-            Notify("Alarm set for " + AlarmTime.Format(record.Minute));
         }
 
         // Returns true when the alt action was consumed by the alarm.
@@ -115,8 +111,15 @@ namespace AlarmClock
             record.Enabled = !record.Enabled;
             if (record.Enabled) record.NextDue = AlarmTime.NextOccurrenceAfter(record.Minute, now);
             PlayClick();
-            Notify(record.Enabled ? "Alarm set for " + AlarmTime.Format(record.Minute) : "Alarm off");
             return true;
+        }
+
+        // Shown over a looked-at chronometer only while the modifier is held.
+        public string Tooltip()
+        {
+            if (!Plugin.ControlsTooltip || !IsEditTarget()) return null;
+            string key = Plugin.ModifierName();
+            return "hold " + key + " and scroll to set the alarm, " + key + " and R to switch it on or off";
         }
 
         public void ApplyLookText()
@@ -125,35 +128,15 @@ namespace AlarmClock
             var record = Record(false);
             bool enabled = record != null && record.Enabled;
             bool editing = Targeted && Plugin.ModifierHeld();
-            if (!enabled && !ringer.IsRinging && !editing)
+            // While ringing, the controls prompt shows how to stop it.
+            if (ringer.IsRinging) item.lookText = "ringing";
+            else if (enabled || editing)
             {
-                if (wroteText)
-                {
-                    item.lookText = "";
-                    item.description = nativeDescription;
-                    wroteText = false;
-                }
-                return;
-            }
-            if (ringer.IsRinging)
-            {
-                // The controls prompt shows how to stop it.
-                item.lookText = "ringing";
-                item.description = nativeDescription;
-            }
-            else
-            {
-                string key = Plugin.ModifierName();
                 int minute = record != null ? record.Minute : AlarmRecord.DefaultMinute;
                 item.lookText = enabled ? "alarm " + AlarmTime.Format(minute) : "alarm off";
-                item.description = "hold " + key + " and scroll to set the alarm, " + key + " and R to switch it on or off";
             }
-            wroteText = true;
-        }
-
-        private static void Notify(string text)
-        {
-            if (NotificationUi.instance != null) NotificationUi.instance.ShowNotification(text, PopupSeconds);
+            else if (wroteText) item.lookText = "";
+            wroteText = ringer.IsRinging || enabled || editing;
         }
 
         private void PlayClick()

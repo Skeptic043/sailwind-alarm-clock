@@ -36,21 +36,19 @@ try {
         @('GameState', 'sleeping'), @('GameState', 'eyesFullyClosed'), @('GameState', 'recovering'), @('GameState', 'sleepingInTavern'),
         @('GameState', 'playing'), @('GameState', 'currentlyLoading'), @('GameState', 'day'), @('GameState', 'modData'),
         @('Sun', 'sun'), @('Sun', 'globalTime'), @('SaveablePrefab', 'instanceId'), @('SaveablePrefab', 'prefabIndex'),
-        @('ShipItem', 'sold'), @('GoPointerButton', 'lookText'), @('GoPointerButton', 'description'),
+        @('ShipItem', 'sold'), @('GoPointerButton', 'lookText'),
         @('GoPointerButton', 'IsLookedAt'), @('PickupableItem', 'held'),
-        @('NotificationUi', 'instance'), @('LookUI', 'controlsText'), @('LookUI', 'ShowRicon'),
+        @('LookUI', 'controlsText'), @('LookUI', 'ShowRicon'),
         @('LookUI', 'HideIcons'), @('LookUI', 'pointer'), @('GoPointer', 'GetHeldItem'), @('ShipItem', 'nailed'),
-        @('Settings', 'controlsTextEnabled'))
+        @('Settings', 'controlsTextEnabled'), @('GoPointer', 'hit'), @('GoPointer', 'pointedAtButton'),
+        @('GoPointer', 'currentLookDistance'), @('GoPointer', 'type'), @('GoPointerButton', 'Look'),
+        @('GoPointerButton', 'unclickable'), @('GameState', 'inCursorMenu'), @('GameState', 'inBed'), @('BoatCamera', 'on'),
+        @('LookUI', 'hintText'))
     foreach ($pair in $members) {
         $type = $game.GetType($pair[0], $true)
         if (@($type.GetMember($pair[1], $all)).Count -eq 0) { throw "Missing native member: $($pair[0]).$($pair[1])" }
         Write-Output "MEMBER PASS: $($pair[0]).$($pair[1])"
     }
-    # The popup uses an exact overload, which a name lookup would not prove.
-    if ($null -eq $game.GetType('NotificationUi', $true).GetMethod('ShowNotification', [Type[]]@([string], [float]))) {
-        throw 'Missing native member: NotificationUi.ShowNotification(string, float)'
-    }
-    Write-Output 'MEMBER PASS: NotificationUi.ShowNotification(string, float)'
 
     Add-Type -Path (Join-Path $PSScriptRoot 'GenerationOnlyPatcher.cs') -ReferencedAssemblies @(
         [HarmonyLib.Harmony].Assembly.Location,

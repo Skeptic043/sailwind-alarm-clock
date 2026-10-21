@@ -16,7 +16,7 @@ Install Alarm Clock through [Sailwind Mod Synchronizer](https://github.com/foxyv
 
 ## How it works
 
-Hold a chronometer you own, or look at one hanging on a wall, and hold `Z`. Scroll to set the alarm time in 15-minute steps, and press R (or right-click) to switch the alarm on or off. Setting a time switches the alarm on, and a short message confirms each change. Looking at the chronometer shows its alarm time. Alarms follow the time on the chronometer's face and repeat every day. Each chronometer keeps its own alarm.
+Hold a chronometer you own, or look at one hanging on a wall, and hold `Z`. Scroll to set the alarm time in 15-minute steps, and press R (or right-click) to switch the alarm on or off. Setting a time switches the alarm on. Looking at the chronometer shows its alarm time, and holding `Z` while looking at it shows how to set it. Alarms follow the time on the chronometer's face and repeat every day. Each chronometer keeps its own alarm.
 
 When the alarm goes off, the chronometer rings and wakes you from sleep. Look at it or hold it to see "stop alarm" beside the R icon, and press R to stop it. Otherwise it stops by itself after a few seconds. A chronometer only rings when you're close to it, so keep it in your inventory or near your bed. Alarms stay silent while you rest at an inn.
 
@@ -31,6 +31,7 @@ Settings are in `BepInEx/config/com.skeptic043.sailwind.alarmclock.cfg` after th
 | `Ring duration` | `5` | How many seconds an alarm rings before it stops by itself, from 1 to 60. |
 | `Volume` | `0.3` | Alarm bell volume, from 0 to 1. |
 | `Bell pitch` | `2.5` | How small the bell sounds, from 1 (the game's original bell) to 3. |
+| `Show controls tooltip` | `true` | Show how to set the alarm while you hold `Z` and look at a chronometer. The alarm time is always shown. |
 
 ## Compatibility
 
