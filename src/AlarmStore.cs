@@ -35,7 +35,7 @@ namespace AlarmClock
         public const string Key = "com.skeptic043.sailwind.alarmclock";
         private readonly Dictionary<int, AlarmRecord> records = new Dictionary<int, AlarmRecord>();
 
-        public IEnumerable<AlarmRecord> Records => records.Values;
+        public Dictionary<int, AlarmRecord>.ValueCollection Records => records.Values;
         public int Count => records.Count;
         // False after unreadable data, so saving leaves the original string untouched.
         public bool Writable { get; private set; } = true;

@@ -1,5 +1,11 @@
 # Release notes
 
+## Version 0.3.0
+
+- Added two recorded mechanical alarm clock sounds, with the warm clock as the new default
+- Replaced the `Bell pitch` setting with `Alarm sound` and `Bell tone`
+- Fixed setting the alarm on a wall-hung chronometer only working while crouched with Furniture Fix installed
+
 ## Version 0.2.1
 
 - Fixed alarm tooltip not showing up when hovering over a locked clock (Thanks Dumpshock)

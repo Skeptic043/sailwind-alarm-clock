@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace AlarmClock
 {
@@ -27,6 +29,23 @@ namespace AlarmClock
             }
             return outcomes;
         }
+
+        // A minimal WAV file: a fmt chunk, an optional odd-sized extra chunk, then the samples.
+        private static byte[] MakeWav(short channels, short bits, short[] samples, bool extraChunk = false)
+        {
+            var stream = new MemoryStream();
+            var writer = new BinaryWriter(stream);
+            writer.Write("RIFF".ToCharArray()); writer.Write(0); writer.Write("WAVE".ToCharArray());
+            writer.Write("fmt ".ToCharArray()); writer.Write(16); writer.Write((short)1); writer.Write(channels);
+            writer.Write(48000); writer.Write(48000 * channels * bits / 8); writer.Write((short)(channels * bits / 8)); writer.Write(bits);
+            if (extraChunk) { writer.Write("LIST".ToCharArray()); writer.Write(3); writer.Write(new byte[4]); }
+            writer.Write("data".ToCharArray()); writer.Write(samples.Length * 2);
+            foreach (short sample in samples) writer.Write(sample);
+            return stream.ToArray();
+        }
+
+        private static string SoundsDirectory([CallerFilePath] string checks = "") =>
+            Path.Combine(Path.GetDirectoryName(checks), "..", "..", "sounds");
 
         private static int Main()
         {
@@ -93,6 +112,30 @@ namespace AlarmClock
             Check(!broken.Load("{\"Schema\":2,\"Alarms\":[]}") && !broken.Writable, "an unknown schema is left unwritten");
             broken.Reset();
             Check(broken.Writable, "reset makes the store writable again");
+
+            var sounds = (AlarmSound[])Enum.GetValues(typeof(AlarmSound));
+            double fourSemitones = Math.Pow(2, 4 / 12.0);
+            Check(sounds.All(sound =>
+                    Math.Abs(AlarmSounds.Pitch(sound, 100) / AlarmSounds.Pitch(sound, 50) - fourSemitones) < 1e-4 &&
+                    Math.Abs(AlarmSounds.Pitch(sound, 50) / AlarmSounds.Pitch(sound, 0) - fourSemitones) < 1e-4),
+                "the tone slider moves every sound up to four semitones either way");
+            Check(AlarmSounds.Pitch(AlarmSound.WarmClock, 50) == 1f && AlarmSounds.Pitch(AlarmSound.BrightClock, 50) == 1f,
+                "recordings play at their recorded pitch at the neutral tone");
+            Check(AlarmSounds.Pitch(AlarmSound.OriginalBell, 50) == 2.5f, "the original bell keeps its small-bell pitch at the neutral tone");
+            Check(AlarmSounds.FileStem(AlarmSound.OriginalBell) == null, "the original bell needs no recording");
+
+            Check(Wav.TryRead(MakeWav(1, 16, new short[] { 0, 16384, -32768 }, true), out var read, out int rate, out _) &&
+                rate == 48000 && read.SequenceEqual(new[] { 0f, 0.5f, -1f }), "mono 16-bit samples read past an odd-sized extra chunk");
+            Check(!Wav.TryRead(MakeWav(2, 16, new short[] { 0, 0 }), out _, out _, out _), "a stereo file is refused");
+            Check(!Wav.TryRead(MakeWav(1, 16, new short[0]), out _, out _, out _), "a file without samples is refused");
+            Check(!Wav.TryRead(new byte[] { 1, 2, 3 }, out _, out _, out _), "a file that is not a WAV is refused");
+            foreach (var sound in sounds.Where(sound => AlarmSounds.FileStem(sound) != null))
+                foreach (string part in new[] { "-loop", "-tail" })
+                {
+                    string path = Path.Combine(SoundsDirectory(), AlarmSounds.FileStem(sound) + part + ".wav");
+                    Check(File.Exists(path) && Wav.TryRead(File.ReadAllBytes(path), out _, out _, out _),
+                        $"the shipped {Path.GetFileName(path)} reads");
+                }
 
             Console.WriteLine(failures == 0 ? "All alarm logic checks passed." : failures + " alarm logic check(s) failed.");
             return failures == 0 ? 0 : 1;

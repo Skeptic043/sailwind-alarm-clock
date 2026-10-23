@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -7,7 +8,7 @@ using UnityEngine;
 
 namespace AlarmClock
 {
-    [BepInPlugin(Id, "Alarm Clock", "0.2.1")]
+    [BepInPlugin(Id, "Alarm Clock", "0.3.0")]
     public sealed class Plugin : BaseUnityPlugin
     {
         public const string Id = "com.skeptic043.sailwind.alarmclock";
@@ -15,8 +16,11 @@ namespace AlarmClock
         private static ConfigEntry<float> ringRange;
         private static ConfigEntry<float> ringDuration;
         private static ConfigEntry<float> volume;
-        private static ConfigEntry<float> bellPitch;
+        private static ConfigEntry<AlarmSound> sound;
+        private static ConfigEntry<int> bellTone;
         private static ConfigEntry<bool> controlsTooltip;
+        private static string controlsTooltipText;
+        private static GoPointer alarmPointer;
         private Harmony harmony;
 
         internal static ManualLogSource Log { get; private set; }
@@ -26,8 +30,15 @@ namespace AlarmClock
         internal static float RingRange => ringRange.Value;
         internal static float RingDuration => ringDuration.Value;
         internal static float Volume => volume.Value;
-        internal static float BellPitch => bellPitch.Value;
+        internal static AlarmSound Sound => sound.Value;
+        internal static int BellTone => bellTone.Value;
         internal static bool ControlsTooltip => controlsTooltip.Value;
+        internal static string ControlsTooltipText => controlsTooltipText;
+
+        // Read the pointer's live selection instead of expiring it by rendered frame.
+        // DoRaycast updates this state in FixedUpdate, which can be much less frequent.
+        internal static bool PointsAt(ShipItemClock clock) =>
+            clock != null && alarmPointer != null && PointerAccess.PointedAt(alarmPointer) == clock;
 
         // KeyboardShortcut.IsPressed fails while any other key is down, which rules out
         // the modifier with R or while walking. Only the shortcut's own keys matter here.
@@ -40,26 +51,30 @@ namespace AlarmClock
             return true;
         }
 
-        internal static string ModifierName() => modifier.Value.ToString();
-
         private void Awake()
         {
             Log = Logger;
             modifier = Config.Bind("Controls", "Alarm modifier", new KeyboardShortcut(KeyCode.Z),
                 "Hold this key while holding or looking at a chronometer. Scroll to set the alarm time and press R to switch the alarm on or off.");
+            UpdateControlsTooltipText();
+            modifier.SettingChanged += (_, __) => UpdateControlsTooltipText();
             ringRange = Config.Bind("Alarm", "Ring range", 25f, new ConfigDescription(
                 "How close the chronometer must be, in meters, for its alarm to ring and wake you.",
                 new AcceptableValueRange<float>(5f, 100f)));
             ringDuration = Config.Bind("Alarm", "Ring duration", 5f, new ConfigDescription(
-                "How many real seconds an alarm rings before it stops by itself.",
+                "How many real seconds an alarm rings before it stops by itself. A recorded clock then winds down for a few seconds.",
                 new AcceptableValueRange<float>(1f, 60f)));
             volume = Config.Bind("Alarm", "Volume", 0.3f, new ConfigDescription(
                 "Alarm bell volume.", new AcceptableValueRange<float>(0f, 1f)));
-            bellPitch = Config.Bind("Alarm", "Bell pitch", 2.5f, new ConfigDescription(
-                "How small the bell sounds. Higher values sound like a smaller, brighter bell. 1 is the game's original bell.",
-                new AcceptableValueRange<float>(1f, 3f)));
+            sound = Config.Bind("Alarm", "Alarm sound", AlarmSound.WarmClock,
+                "Which bell rings. A change applies from the next alarm.");
+            bellTone = Config.Bind("Alarm", "Bell tone", AlarmSounds.NeutralTone, new ConfigDescription(
+                "Lower values sound deeper and heavier, higher values brighter and smaller. 50 is each sound's natural tone.",
+                new AcceptableValueRange<int>(0, 100)));
             controlsTooltip = Config.Bind("Display", "Show controls tooltip", true,
                 "While you hold the alarm modifier and look at a chronometer, show how to set the alarm below it. The alarm time is always shown.");
+            // A recording that cannot be read falls back to the original bell, so it never stops the plugin.
+            AlarmRinger.LoadRecordings(Path.Combine(Path.GetDirectoryName(Info.Location), "sounds"));
             try
             {
                 harmony = new Harmony(Id);
@@ -79,6 +94,12 @@ namespace AlarmClock
                 Logger.LogError("Alarm Clock disabled after initialization failed. " +
                     "Check game and mod compatibility: " + exception);
             }
+        }
+
+        private static void UpdateControlsTooltipText()
+        {
+            string key = modifier.Value.ToString();
+            controlsTooltipText = "hold " + key + " and scroll to set the alarm, " + key + " and R to switch it on or off";
         }
 
         private static void Guard(string patch, Action action)
@@ -115,6 +136,8 @@ namespace AlarmClock
         // With empty hands the native raycast only targets nailed crates, bottles and beds,
         // so a nailed chronometer could not be looked at, set or stopped. Target it the
         // same way those items are, after the raycast has stored this frame's hit.
+        // The alarm then follows the pointer's target rather than IsLookedAt, because
+        // Furniture Fix skips Look for wall items aboard unless the player crouches.
         private static class PointerAccess
         {
             public static readonly AccessTools.FieldRef<GoPointer, RaycastHit> Hit =
@@ -126,11 +149,22 @@ namespace AlarmClock
         }
 
         [HarmonyPatch(typeof(GoPointer), "DoRaycast")]
-        private static class NailedLookPatch
+        private static class PointerTargetPatch
         {
-            private static void Postfix(GoPointer __instance) => Guard("nailed look", () =>
+            private static void Postfix(GoPointer __instance) => Guard("pointer target", () =>
             {
-                if (__instance.type == GoPointer.PointerType.crosshairMouse && GameState.inCursorMenu) return;
+                if (__instance.type == GoPointer.PointerType.crosshairMouse && GameState.inCursorMenu)
+                {
+                    if (alarmPointer == __instance) alarmPointer = null;
+                    return;
+                }
+                TargetNailedClock(__instance);
+                if (PointerAccess.PointedAt(__instance) is ShipItemClock) alarmPointer = __instance;
+                else if (alarmPointer == __instance) alarmPointer = null;
+            });
+
+            private static void TargetNailedClock(GoPointer __instance)
+            {
                 if (PointerAccess.PointedAt(__instance) != null || __instance.GetHeldItem() != null) return;
                 if (GameState.sleeping || GameState.inBed != null || BoatCamera.on) return;
                 var hit = PointerAccess.Hit(__instance);
@@ -142,7 +176,7 @@ namespace AlarmClock
                 PointerAccess.PointedAt(__instance) = clock;
                 clock.Look(__instance);
                 PointerAccess.LookDistance(__instance) = hit.distance;
-            });
+            }
         }
 
         // Taking the wheel here, before GoPointer reads it, keeps native scroll

@@ -26,6 +26,9 @@ else { Write-Warning 'icon.png is missing. The package is fine for local testing
 $entries = @($releaseNames | ForEach-Object { [pscustomobject]@{ Source=(Join-Path $projectRoot $_); Name=$_ } })
 $entries += [pscustomobject]@{ Source=(Join-Path $projectRoot 'bin/Release/net471/AlarmClock.dll')
     Name='BepInEx/plugins/AlarmClock/AlarmClock.dll' }
+foreach ($sound in @('warm-clock-loop.wav','warm-clock-tail.wav','bright-clock-loop.wav','bright-clock-tail.wav','SOURCES.md')) {
+    $entries += [pscustomobject]@{ Source=(Join-Path $projectRoot "sounds/$sound"); Name="BepInEx/plugins/AlarmClock/sounds/$sound" }
+}
 foreach ($entry in $entries) {
     if (-not [IO.File]::Exists($entry.Source)) { throw "Required package input is missing: $($entry.Name)" }
 }

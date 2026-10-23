@@ -6,3 +6,4 @@
 *.csproj text eol=lf
 *.svg text eol=lf
 *.png binary
+*.wav binary

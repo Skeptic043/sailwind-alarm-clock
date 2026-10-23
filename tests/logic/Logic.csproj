@@ -10,5 +10,7 @@
     <Compile Include="Checks.cs" />
     <Compile Include="../../src/AlarmTime.cs" />
     <Compile Include="../../src/AlarmStore.cs" />
+    <Compile Include="../../src/AlarmSound.cs" />
+    <Compile Include="../../src/Wav.cs" />
   </ItemGroup>
 </Project>

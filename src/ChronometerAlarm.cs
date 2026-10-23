@@ -11,10 +11,13 @@ namespace AlarmClock
         private static int editFrame = -10;
         private static AudioClip click;
 
+        private ShipItemClock clock;
         private ShipItem item;
         private SaveablePrefab saveable;
         private AlarmRinger ringer;
         private int registeredId;
+        private int alarmTextMinute = -1;
+        private string alarmText;
         private bool wroteText;
         private float wheelAccumulated;
 
@@ -31,7 +34,8 @@ namespace AlarmClock
 
         private void Awake()
         {
-            item = GetComponent<ShipItem>();
+            clock = GetComponent<ShipItemClock>();
+            item = clock;
             saveable = GetComponent<SaveablePrefab>();
             ringer = gameObject.AddComponent<AlarmRinger>();
         }
@@ -45,13 +49,20 @@ namespace AlarmClock
                 if (id > 0) { live[id] = this; registeredId = id; }
             }
             if (!Owned) return;
-            if (IsEditTarget())
+            bool held = item.held != null;
+            bool pointedAt = Plugin.PointsAt(clock);
+            bool targeted = held || (pointedAt && !AnyHeld());
+            bool editing = targeted && Plugin.ModifierHeld();
+            if (editing)
             {
                 editFrame = Time.frameCount;
                 HandleScroll();
             }
             else wheelAccumulated = 0f;
-            if (item.held != null) ApplyLookText();
+            // The native UpdateLookText postfix owns ordinary looked-at clocks. This
+            // fallback is only needed when another mod keeps the pointer target but
+            // deliberately suppresses Look, as Furniture Fix does for wall items.
+            if (held || (pointedAt && !item.IsLookedAt())) ApplyLookText(editing);
         }
 
         private void OnDestroy() => Unregister();
@@ -68,7 +79,9 @@ namespace AlarmClock
 
         // A held chronometer takes the controls, so looking at another one while
         // holding it never changes both.
-        private bool Targeted => item.held != null || (item.IsLookedAt() && !AnyHeld());
+        private bool Targeted => item.held != null || (PointedAt && !AnyHeld());
+
+        private bool PointedAt => Plugin.PointsAt(clock);
 
         private static bool AnyHeld()
         {
@@ -118,22 +131,34 @@ namespace AlarmClock
         public string Tooltip()
         {
             if (!Plugin.ControlsTooltip || !IsEditTarget()) return null;
-            string key = Plugin.ModifierName();
-            return "hold " + key + " and scroll to set the alarm, " + key + " and R to switch it on or off";
+            return Plugin.ControlsTooltipText;
         }
 
         public void ApplyLookText()
         {
             if (!Owned) return;
+            ApplyLookText(Targeted && Plugin.ModifierHeld());
+        }
+
+        private void ApplyLookText(bool editing)
+        {
             var record = Record(false);
             bool enabled = record != null && record.Enabled;
-            bool editing = Targeted && Plugin.ModifierHeld();
             // While ringing, the controls prompt shows how to stop it.
             if (ringer.IsRinging) item.lookText = "ringing";
             else if (enabled || editing)
             {
                 int minute = record != null ? record.Minute : AlarmRecord.DefaultMinute;
-                item.lookText = enabled ? "alarm " + AlarmTime.Format(minute) : "alarm off";
+                if (enabled)
+                {
+                    if (alarmText == null || alarmTextMinute != minute)
+                    {
+                        alarmTextMinute = minute;
+                        alarmText = "alarm " + AlarmTime.Format(minute);
+                    }
+                    item.lookText = alarmText;
+                }
+                else item.lookText = "alarm off";
             }
             else if (wroteText) item.lookText = "";
             wroteText = ringer.IsRinging || enabled || editing;

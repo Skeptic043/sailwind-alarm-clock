@@ -28,9 +28,10 @@ Settings are in `BepInEx/config/com.skeptic043.sailwind.alarmclock.cfg` after th
 | --- | --- | --- |
 | `Alarm modifier` | `Z` | The key to hold while scrolling or pressing R to set the alarm. |
 | `Ring range` | `25` | How close, in meters, you need to be for a chronometer to ring and wake you, from 5 to 100. |
-| `Ring duration` | `5` | How many seconds an alarm rings before it stops by itself, from 1 to 60. |
+| `Ring duration` | `5` | How many seconds an alarm rings before it stops by itself, from 1 to 60. A recorded clock then winds down for a few seconds. |
 | `Volume` | `0.3` | Alarm bell volume, from 0 to 1. |
-| `Bell pitch` | `2.5` | How small the bell sounds, from 1 (the game's original bell) to 3. |
+| `Alarm sound` | `WarmClock` | `WarmClock` (warm mechanical clock), `BrightClock` (bright twin-bell clock) or `OriginalBell` (the original Sailwind bell). A change applies from the next alarm. |
+| `Bell tone` | `50` | From 0 (deeper and heavier) to 100 (brighter and smaller). 50 is each sound's natural tone. |
 | `Show controls tooltip` | `true` | Show how to set the alarm while you hold `Z` and look at a chronometer. The alarm time is always shown. |
 
 ## Compatibility
