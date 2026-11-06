@@ -42,8 +42,6 @@ No known incompatibilities. While `Z` is held on a chronometer, scrolling sets t
 
 AI was used to write all of the code in this project. The original concept, design direction, testing, debugging, and release decisions are my own. If you prefer not to use mods developed with AI assistance, I understand and respect that choice.
 
-## Issues and links
+## Links
 
-[Report an issue](https://github.com/Skeptic043/sailwind-alarm-clock/issues) with your mod version and `BepInEx/LogOutput.log`.
-
-[Source code](https://github.com/Skeptic043/sailwind-alarm-clock) · [Release notes](CHANGELOG.md) · [MIT License](LICENSE) · [Support on Ko-fi](https://ko-fi.com/skeptic043) · skeptic043
+[Report an issue](https://github.com/Skeptic043/sailwind-alarm-clock/issues) · [Source code](https://github.com/Skeptic043/sailwind-alarm-clock) · [Release notes](https://github.com/Skeptic043/sailwind-alarm-clock/blob/main/CHANGELOG.md) · [Build instructions](https://github.com/Skeptic043/sailwind-alarm-clock/blob/main/BUILDING.md) · [License](https://github.com/Skeptic043/sailwind-alarm-clock/blob/main/LICENSE) · [Support on Ko-fi](https://ko-fi.com/skeptic043) · skeptic043
